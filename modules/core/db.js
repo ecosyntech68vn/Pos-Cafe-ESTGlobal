@@ -18,12 +18,14 @@
       const scripts = document.getElementsByTagName('script');
       for (let i = 0; i < scripts.length; i++) {
         const src = scripts[i].src || '';
-        if (src.indexOf('/modules/core/db.js') >= 0) {
-          return new URL('../../', src).href;
-        }
+        if (src.indexOf('/modules/core/db.js') >= 0) return new URL('../../', src).href;
+        if (src.indexOf('/assets/bundle.js') >= 0) return new URL('../', src).href;
       }
+      // Fallback: detect từ URL hiện tại — dùng cho trường hợp bundle hoặc deploy không script tag chuẩn
+      const path = location.pathname.replace(/\/[^/]*$/, '');
+      return location.origin + (path ? path + '/' : '/');
     } catch (e) { /* ignore */ }
-    return ''; // fallback: relative
+    return location.origin + '/';
   })();
   const SCHEMA_URL       = BASE_PATH + 'modules/core/db-schema.sql';
   // PATCH 2026-06-09: bypass JSON seed - load directly from 4 CSV (Tiệm Bên Suối FULL data)
