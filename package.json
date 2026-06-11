@@ -1,0 +1,21 @@
+{
+  "name": "ecosyntech-pos-cafe-main",
+  "version": "1.0.0",
+  "description": "Phần mềm bán hàng cho quán cafe / trà sữa nhỏ. **Offline-first**, chạy thẳng trong trình duyệt — không cần server, không cần cài đặt phức tạp.",
+  "main": "service-worker.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "build:watch": "node build.js --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}
