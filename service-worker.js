@@ -4,7 +4,9 @@
 // ============================================================================
 // 2026-06-10 v9: thêm kiotviet-pull.js (index.html load nhưng không cache → offline chết),
 // 4 file data/*.csv (db.js seed lần đầu cần), branch-preset config.
-const CACHE = 'pos-cafe-v18'; // v18 2026-06-12: multi-branch + white-label + 3 theme mới
+const CACHE = 'pos-cafe-v19'; // v19 2026-06-12: hotfix brandEdit + nhúng branch-preset + preset-rescue PIN
+// ⚠ QUY TẮC: MỖI lần sửa index.html/bundle.js PHẢI bump version này — không bump,
+// máy khách bị service worker giữ bản cũ vĩnh viễn (cache-first).
 const CORE_ASSETS = [
   './',
   './index.html',
