@@ -25,6 +25,9 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.10/dist/cdn.min.js"></script>
 
   <!-- Bundled modules (config + core + auth + pos + dashboard + import + sync) -->
+  <!-- HOTFIX 2026-06-12: preset PHẢI nạp TRƯỚC bundle — thiếu dòng này, seed lần đầu
+       chạy không preset → tên quán mặc định + PIN NGẪU NHIÊN (khoá máy không đăng nhập được) -->
+  <script src="config/branch-preset.tiembensuoi.js"></script>
   <script src="assets/bundle.js?v=1.0"></script>
 </head>
 <body>
@@ -2299,6 +2302,28 @@
               this.selectedBranchId = this.shop.id;
               localStorage.setItem('eco_branch_id', String(this.shop.id));
             }
+            // HOTFIX 2026-06-12 — GIẢI CỨU máy đã lỡ seed KHÔNG có preset (PIN random → khoá máy):
+            // nếu preset có mà tên quán vẫn là mặc định → áp tên/cấu hình + reset PIN về preset.
+            // Idempotent: chạy xong tên đổi → lần sau không chạy nữa. Đổi PIN trong app vẫn giữ.
+            try {
+              const _preset = window.__BRANCH_PRESET__;
+              if (_preset && this.shop && this.shop.name === 'Quán cafe của tôi' && _preset.name) {
+                DB.run("UPDATE branches SET name=?, slogan=?, address=?, phone=?, tax_rate=? WHERE id=?",
+                  [_preset.name, _preset.slogan || '', _preset.address || '', _preset.phone || '', _preset.tax_rate ?? 0, this.shop.id]);
+                if (_preset.default_pins?.owner) {
+                  const _oh = await Utils.hashPin(_preset.default_pins.owner, this.shop.id);
+                  DB.run("UPDATE users SET pin_hash=? WHERE branch_id=? AND role='owner'", [_oh, this.shop.id]);
+                }
+                if (_preset.default_pins?.staff) {
+                  const _sh = await Utils.hashPin(_preset.default_pins.staff, this.shop.id);
+                  DB.run("UPDATE users SET pin_hash=? WHERE branch_id=? AND role='staff'", [_sh, this.shop.id]);
+                }
+                await DB.persist();
+                this.shop = Models.getShop(this.shop.id) || Models.getShop();
+                this.branches = Models.listBranches();
+                console.log('[preset-rescue] Đã áp preset + reset PIN về mặc định preset');
+              }
+            } catch (e) { console.warn('[preset-rescue]', e); }
             this.brandEdit.name = this.shop?.name || '';
             this.brandEdit.slogan = this.shop?.slogan || '';
             this.vatPct = this.shop?.tax_rate || 0;
