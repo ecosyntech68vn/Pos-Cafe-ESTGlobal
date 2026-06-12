@@ -2084,6 +2084,9 @@
         online: navigator.onLine,
         user: null,
         shop: null,
+        // HOTFIX 2026-06-12: brandEdit được dùng trong boot()/saveBrand nhưng chưa khai báo
+        // → "Cannot set properties of undefined (setting 'name')" chết app ngay khởi động
+        brandEdit: { name: '', slogan: '' },
 
         // ---- Login ----
         pin: '',
