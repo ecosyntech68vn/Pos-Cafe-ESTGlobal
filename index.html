@@ -432,7 +432,7 @@
                           <div style="display: flex; gap: 4px; align-items: center;">
                             <button class="qty-btn" @click="cart.dec(idx)">−</button>
                             <span class="num" style="width: 24px; text-align: center;" x-text="it.qty"></span>
-                            <button class="qty-btn" @click="cart.inc(idx)">+</button>
+                            <button class="qty-btn" @click="guardInc(idx) && cart.inc(idx)">+</button>
                           </div>
                           <div class="num" style="font-weight: 600;" x-text="formatVND(it.line_total)"></div>
                         </div>
@@ -2492,11 +2492,60 @@
         },
 
         // ---- POS ----
+        // ====== STOCK GUARD 2026-06-12 (CEO yêu cầu): KHÔNG cho đặt vượt tồn nguyên liệu ======
+        // Tính nhu cầu nguyên liệu của TOÀN GIỎ (kể cả món sắp thêm) bằng chính preview
+        // của Models.deductInventoryForOrderItems → so với ingredients.stock_current.
+        _stockShortages(trialItems) {
+          try {
+            const items = trialItems.map(it => ({
+              product_id: it.product_id, product_name: it.product_name || '',
+              qty: it.qty, variants_json: JSON.stringify(it.variants || [])
+            }));
+            const deds = Models.deductInventoryForOrderItems(this.shop.id, 0, items, 'preview') || [];
+            const need = {};
+            deds.forEach(d => {
+              if (!need[d.ingredient_id]) need[d.ingredient_id] = { name: d.ingredient_name, unit: d.unit, qty: 0 };
+              need[d.ingredient_id].qty += d.qty;
+            });
+            const shortages = [];
+            Object.entries(need).forEach(([id, n]) => {
+              const r = DB.exec("SELECT stock_current FROM ingredients WHERE id=?", [id]);
+              const have = r.length ? Number(r[0].stock_current) : 0;
+              if (have < n.qty) shortages.push({ name: n.name, unit: n.unit || '', need: n.qty, have });
+            });
+            return shortages;
+          } catch (e) { console.warn('[stock-guard]', e); return []; } // lỗi guard → không chặn bán
+        },
+        _trialCart(extra, incIdx) {
+          const trial = this.cart.items.map((it, i) => ({
+            product_id: it.product_id, product_name: it.product_name,
+            qty: it.qty + (i === incIdx ? 1 : 0), variants: it.variants
+          }));
+          if (extra) trial.push(extra);
+          return trial;
+        },
+        _toastShort(sh) {
+          const s = sh[0];
+          const fmt = (v) => (Math.round(v * 10) / 10).toLocaleString('vi-VN');
+          this.showToast(`⛔ Không đủ nguyên liệu: ${s.name} — cần ${fmt(s.need)}${s.unit}, còn ${fmt(Math.max(0, s.have))}${s.unit}. Kiểm tra mục Kho.`);
+        },
+        guardAddToCart(p, variants) {
+          const sh = this._stockShortages(this._trialCart({ product_id: p.id, product_name: p.name, qty: 1, variants: variants || [] }, -1));
+          if (sh.length) { this._toastShort(sh); return false; }
+          return true;
+        },
+        guardInc(idx) {
+          const sh = this._stockShortages(this._trialCart(null, idx));
+          if (sh.length) { this._toastShort(sh); return false; }
+          return true;
+        },
+        // ====== /STOCK GUARD ======
         onProductClick(p) {
           const groups = Models.getVariantGroupsForProduct(p.id).map(g => ({
             ...g, variants: Models.getVariantsForGroup(g.id)
           }));
           if (groups.length === 0) {
+            if (!this.guardAddToCart(p, [])) return; // STOCK GUARD
             this.cart.addProduct(p, []);
             this.showToast('Đã thêm ' + p.name, () => { this.cart.remove(this.cart.items.length - 1); });
             return;
@@ -2509,6 +2558,7 @@
         },
         quickAdd(p) {
           // Add with empty variants (default product) — fast path
+          if (!this.guardAddToCart(p, [])) return; // STOCK GUARD
           this.cart.addProduct(p, []);
           this.showToast('+1 ' + p.name, () => { this.cart.remove(this.cart.items.length - 1); });
         },
@@ -2535,6 +2585,7 @@
         },
         confirmVariantPick() {
           const flat = Object.values(this.variantPicker.selection).flat();
+          if (!this.guardAddToCart(this.variantPicker.product, flat)) return; // STOCK GUARD
           this.cart.addProduct(this.variantPicker.product, flat);
           const productName = this.variantPicker.product.name;
           this.variantPicker.open = false;
