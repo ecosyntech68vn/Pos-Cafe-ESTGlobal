@@ -185,6 +185,13 @@
       safeAlter('branches', 'telegram_notify_enabled',  'INTEGER DEFAULT 0');
       recordVersion(3);
     }
+    // ---- v4 (V23 freeze fix): idx_orders_kitchen — composite (branch_id, kitchen_status, created_at) cho Kanban poll ----
+    if (cur < 4) {
+      console.log('[migrate] v3 → v4 add idx_orders_kitchen');
+      try { db.exec("CREATE INDEX IF NOT EXISTS idx_orders_kitchen ON orders(branch_id, kitchen_status, created_at)"); }
+      catch (e) { console.warn('[migrate v4] idx_orders_kitchen', e.message); }
+      recordVersion(4);
+    }
   }
 
   async function seedIfEmpty() {

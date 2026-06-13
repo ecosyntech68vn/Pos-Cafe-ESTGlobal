@@ -2397,9 +2397,29 @@
                 KiotVietPull.startPolling(this);
               }
             } catch (e) { console.warn('[kv-pull] boot fail', e); }
-            // Kitchen poll (5s) for new self-order Kiosk submissions
+            // V23 freeze fix: adaptive kitchen poll — 5s active / 15s idle / pause hidden
             this.kitchenLastPoll = Date.now();
-            this.kitchenPollTimer = setInterval(() => this.pollKitchen(), 5000);
+            this.kitchenLastActivity = Date.now();
+            this._scheduleKitchenPoll();
+            // Pause polling khi tab ẩn → resume khi visible
+            this._visHandler = () => {
+              if (document.hidden) {
+                if (this.kitchenPollTimer) { clearTimeout(this.kitchenPollTimer); this.kitchenPollTimer = null; }
+                if (this.sepayPollTimer)   { clearInterval(this.sepayPollTimer);  this.sepayPollTimer = null; }
+              } else {
+                this.kitchenLastActivity = Date.now();
+                this._scheduleKitchenPoll();
+                if (this.sepay?.enabled && this.sepay?.api_key && !this.sepayPollTimer) this.startSepayPolling();
+              }
+            };
+            document.addEventListener('visibilitychange', this._visHandler);
+            this._beforeUnload = () => {
+              if (this.kitchenPollTimer) { clearTimeout(this.kitchenPollTimer); this.kitchenPollTimer = null; }
+              if (this.sepayPollTimer)   { clearInterval(this.sepayPollTimer);  this.sepayPollTimer = null; }
+              if (this.autoLogoutTimer)  { clearTimeout(this.autoLogoutTimer);  this.autoLogoutTimer = null; }
+              try { document.removeEventListener('visibilitychange', this._visHandler); } catch (_) {}
+            };
+            window.addEventListener('beforeunload', this._beforeUnload);
             if ('serviceWorker' in navigator) {
               navigator.serviceWorker.register('service-worker.js').catch(e => console.warn('SW reg', e));
             }
@@ -2471,7 +2491,9 @@
         },
         logout() {
           if (this.sepayPollTimer) { clearInterval(this.sepayPollTimer); this.sepayPollTimer = null; }
-          if (this.kitchenPollTimer) { clearInterval(this.kitchenPollTimer); this.kitchenPollTimer = null; }
+          if (this.kitchenPollTimer) { clearTimeout(this.kitchenPollTimer); this.kitchenPollTimer = null; }
+          try { document.removeEventListener('visibilitychange', this._visHandler); } catch (_) {}
+          try { window.removeEventListener('beforeunload', this._beforeUnload); } catch (_) {}
           KiotVietPull.stopPolling();
           Session.clear(); this.user = null;
         },
@@ -2784,7 +2806,7 @@
           if (v === 'inventory') this.loadCatalog();
           if (v === 'pos') this.loadFavorites();
           if (v === 'import') this.impInit();
-          if (v === 'kitchen') this.loadKitchen();
+          if (v === 'kitchen') { this.kitchenLastActivity = Date.now(); this.loadKitchen(); this._scheduleKitchenPoll && this._scheduleKitchenPoll(); }
         },
 
         // ---- Product Editor (full modal with recipe tab) ----
@@ -2921,8 +2943,20 @@
             preparing: Models.listKitchenOrdersByStatus(this.shop.id, 'preparing'),
             ready:     Models.listKitchenOrdersByStatus(this.shop.id, 'ready'),
           };
+          // V23 freeze fix: prefetch order items 1 lần thay vì N+1 query mỗi Alpine tick
+          const ids = [].concat(this.kitchen.pending, this.kitchen.preparing, this.kitchen.ready).map(o => o.id);
+          this._kitchenItemsMap = Object.create(null);
+          for (const id of ids) {
+            try { this._kitchenItemsMap[id] = Models.getOrderItems(id); }
+            catch (e) { this._kitchenItemsMap[id] = []; }
+          }
         },
-        kitchenItemsFor(orderId) { return Models.getOrderItems(orderId); },
+        kitchenItemsFor(orderId) {
+          // V23: trả từ cache prefetch (fallback nếu cache miss)
+          const cached = this._kitchenItemsMap && this._kitchenItemsMap[orderId];
+          if (cached !== undefined) return cached;
+          return Models.getOrderItems(orderId);
+        },
         toggleRecipes() {
           this.showRecipes = !this.showRecipes;
           localStorage.setItem('eco_kitchen_recipes', this.showRecipes ? '1' : '0');
@@ -2979,10 +3013,22 @@
               this.showToast('🔔 ' + newCount + ' đơn mới chờ làm');
               if (this.view === 'kitchen') this.loadKitchen();
               this.refreshDashboard();
+              this.kitchenLastActivity = Date.now(); // có đơn mới = active
             }
           } catch (e) {
             console.warn('[kitchen-poll]', e.message);
           }
+        },
+        // V23 freeze fix: adaptive scheduler — 5s khi active (last activity <60s), 15s khi idle
+        _scheduleKitchenPoll() {
+          if (document.hidden) return;
+          const idleMs = Date.now() - (this.kitchenLastActivity || 0);
+          const interval = idleMs < 60000 ? 5000 : 15000;
+          if (this.kitchenPollTimer) clearTimeout(this.kitchenPollTimer);
+          this.kitchenPollTimer = setTimeout(() => {
+            this.pollKitchen();
+            this._scheduleKitchenPoll();
+          }, interval);
         },
         confettiBurst() {
           try {

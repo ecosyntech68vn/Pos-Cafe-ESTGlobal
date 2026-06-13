@@ -252,6 +252,7 @@
           WHERE o.branch_id=? AND o.status IN ('paid','pending')
             AND (o.kitchen_status IS NULL OR o.kitchen_status = 'pending')
           ORDER BY o.created_at ASC
+          LIMIT 100
         `, [branchId]);
       }
       return DB.exec(`
@@ -259,6 +260,7 @@
         FROM orders o LEFT JOIN users u ON u.id = o.assigned_user_id
         WHERE o.branch_id=? AND o.kitchen_status=?
         ORDER BY o.created_at ASC
+        LIMIT 100
       `, [branchId, status]);
     },
     updateKitchenStatus(orderId, status, userId) {
