@@ -170,7 +170,7 @@ CREATE TABLE IF NOT EXISTS shifts (
 
 -- Sync log
 CREATE TABLE IF NOT EXISTS sync_log (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id INTEGER PRIMARY KEY NOT NULL,
   entity TEXT NOT NULL,
   entity_id INTEGER,
   action TEXT NOT NULL CHECK(action IN ('push','pull')),
@@ -189,3 +189,7 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (1, strftime('%s','now')*1000);
+
+-- 2026-06-13 V2.6 PERF: index cho hot path POS/Bếp (freeze fix)
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS idx_orders_branch_created ON orders(branch_id, created_at);
