@@ -18,6 +18,9 @@
   <script src="https://cdn.jsdelivr.net/npm/sql.js@1.10.3/dist/sql-wasm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.10/dist/cdn.min.js"></script>
 
+  <!-- HOTFIX 2026-06-13: preset PHẢI nạp trước db.js — kiosk mở lần đầu trên máy mới
+       mà thiếu dòng này → seed không preset: tên quán sai + THIẾU config QR ngân hàng -->
+  <script src="config/branch-preset.tiembensuoi.js"></script>
   <script src="config/business-rules.js"></script>
   <script src="config/payment-methods.js"></script>
   <script src="modules/core/utils.js"></script>
@@ -542,6 +545,38 @@
 
           await DB.init();
           this.shop = Models.getShop();
+          // HOTFIX 2026-06-13 — GIẢI CỨU DB đã lỡ seed thiếu preset (đồng bộ với index.html):
+          // áp tên quán + cấu hình thanh toán + reset PIN về preset. Idempotent.
+          try {
+            const _p = window.__BRANCH_PRESET__;
+            if (_p && this.shop && this.shop.name === 'Quán cafe của tôi' && _p.name) {
+              DB.run("UPDATE branches SET name=?, slogan=?, address=?, phone=?, tax_rate=? WHERE id=?",
+                [_p.name, _p.slogan || '', _p.address || '', _p.phone || '', _p.tax_rate ?? 0, this.shop.id]);
+              if (_p.payment) {
+                DB.run("UPDATE branches SET payment_bank_bin=?, payment_account_no=?, payment_account_name=?, payment_qr_enabled=? WHERE id=?",
+                  [_p.payment.bank_bin || '', _p.payment.account_no || '', _p.payment.account_name || '', _p.payment.qr_enabled ? 1 : 0, this.shop.id]);
+              }
+              if (_p.default_pins?.owner) {
+                const _oh = await Utils.hashPin(_p.default_pins.owner, this.shop.id);
+                DB.run("UPDATE users SET pin_hash=? WHERE branch_id=? AND role='owner'", [_oh, this.shop.id]);
+              }
+              if (_p.default_pins?.staff) {
+                const _sh = await Utils.hashPin(_p.default_pins.staff, this.shop.id);
+                DB.run("UPDATE users SET pin_hash=? WHERE branch_id=? AND role='staff'", [_sh, this.shop.id]);
+              }
+              await DB.persist();
+              this.shop = Models.getShop(this.shop.id) || Models.getShop();
+              console.log('[kiosk preset-rescue] Đã áp preset Tiệm Bên Suối');
+            }
+            // Máy đã đúng tên quán nhưng thiếu payment (rescue đợt 1 của index) → áp riêng
+            if (_p?.payment?.bank_bin && this.shop && !this.shop.payment_bank_bin) {
+              DB.run("UPDATE branches SET payment_bank_bin=?, payment_account_no=?, payment_account_name=?, payment_qr_enabled=? WHERE id=?",
+                [_p.payment.bank_bin || '', _p.payment.account_no || '', _p.payment.account_name || '', _p.payment.qr_enabled ? 1 : 0, this.shop.id]);
+              await DB.persist();
+              this.shop = Models.getShop(this.shop.id) || Models.getShop();
+              console.log('[kiosk preset-rescue] Đã áp cấu hình thanh toán QR');
+            }
+          } catch (e) { console.warn('[kiosk preset-rescue]', e); }
           this.categories = Models.listCategories(this.shop.id);
           this.products = Models.listProducts(this.shop.id);
 

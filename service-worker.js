@@ -4,7 +4,7 @@
 // ============================================================================
 // 2026-06-10 v9: thêm kiotviet-pull.js (index.html load nhưng không cache → offline chết),
 // 4 file data/*.csv (db.js seed lần đầu cần), branch-preset config.
-const CACHE = 'pos-cafe-v20'; // v20 2026-06-12: STOCK GUARD — chặn bán vượt tồn nguyên liệu
+const CACHE = 'pos-cafe-v21'; // v21 2026-06-13: kiosk nhúng preset + rescue payment QR config
 // ⚠ QUY TẮC: MỖI lần sửa index.html/bundle.js PHẢI bump version này — không bump,
 // máy khách bị service worker giữ bản cũ vĩnh viễn (cache-first).
 const CORE_ASSETS = [

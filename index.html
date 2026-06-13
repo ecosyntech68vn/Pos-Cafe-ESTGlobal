@@ -2324,6 +2324,18 @@
                 console.log('[preset-rescue] Đã áp preset + reset PIN về mặc định preset');
               }
             } catch (e) { console.warn('[preset-rescue]', e); }
+            // HOTFIX 2026-06-13 — máy đã qua rescue đợt 1 còn THIẾU cấu hình thanh toán QR:
+            // áp riêng payment từ preset nếu bank_bin đang trống (idempotent).
+            try {
+              const _p2 = window.__BRANCH_PRESET__;
+              if (_p2?.payment?.bank_bin && this.shop && !this.shop.payment_bank_bin) {
+                DB.run("UPDATE branches SET payment_bank_bin=?, payment_account_no=?, payment_account_name=?, payment_qr_enabled=? WHERE id=?",
+                  [_p2.payment.bank_bin || '', _p2.payment.account_no || '', _p2.payment.account_name || '', _p2.payment.qr_enabled ? 1 : 0, this.shop.id]);
+                await DB.persist();
+                this.shop = Models.getShop(this.shop.id) || Models.getShop();
+                console.log('[preset-rescue] Đã áp cấu hình thanh toán QR từ preset');
+              }
+            } catch (e) { console.warn('[preset-rescue payment]', e); }
             this.brandEdit.name = this.shop?.name || '';
             this.brandEdit.slogan = this.shop?.slogan || '';
             this.vatPct = this.shop?.tax_rate || 0;
