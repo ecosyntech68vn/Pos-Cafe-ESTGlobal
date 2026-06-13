@@ -4,7 +4,7 @@
 // ============================================================================
 // 2026-06-10 v9: thêm kiotviet-pull.js (index.html load nhưng không cache → offline chết),
 // 4 file data/*.csv (db.js seed lần đầu cần), branch-preset config.
-const CACHE = 'pos-cafe-v22'; // v22 2026-06-13: FIX BOOT TREO MÁY MỚI — seed preset UPDATE cột payment chưa tồn tại (migration chạy sau seed) → "no such column" nuốt lặng. Sửa db.js (migration trước seed) + index/kiosk tách preset extras trước DB.init()
+const CACHE = 'pos-cafe-v23'; // v23 2026-06-13: FREEZE FIX POS — adaptive poll 5s active / 15s idle / pause hidden; prefetch order_items + recipes vào loadKitchen (chống N+1 query mỗi Alpine tick); migration v4 thêm idx_orders_kitchen + idx_order_items_order + idx_orders_branch_created; LIMIT 100 cho 3 lane Kanban; Sepay poll cũng pause khi hidden; beforeunload cleanup intervals + listeners.
 // ⚠ QUY TẮC: MỖI lần sửa index.html/bundle.js PHẢI bump version này — không bump,
 // máy khách bị service worker giữ bản cũ vĩnh viễn (cache-first).
 const CORE_ASSETS = [
