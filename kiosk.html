@@ -543,7 +543,17 @@
           const params = new URLSearchParams(location.search);
           this.tableNo = params.get('table') || '';
 
+          // HOTFIX 2026-06-13: tách payment/sepay/telegram khỏi preset trước seed
+          // (schema gốc thiếu cột — migration chạy sau; db.js đã sửa thứ tự nhưng giữ
+          // lớp bảo hiểm này cho đồng bộ với index/bundle cũ). Rescue dưới áp lại sau.
+          let _presetExtras = null;
+          if (window.__BRANCH_PRESET__) {
+            const _bp = window.__BRANCH_PRESET__;
+            _presetExtras = { payment: _bp.payment, sepay: _bp.sepay, telegram: _bp.telegram };
+            delete _bp.payment; delete _bp.sepay; delete _bp.telegram;
+          }
           await DB.init();
+          if (_presetExtras && window.__BRANCH_PRESET__) Object.assign(window.__BRANCH_PRESET__, _presetExtras);
           this.shop = Models.getShop();
           // HOTFIX 2026-06-13 — GIẢI CỨU DB đã lỡ seed thiếu preset (đồng bộ với index.html):
           // áp tên quán + cấu hình thanh toán + reset PIN về preset. Idempotent.

@@ -2291,7 +2291,17 @@
 
           try {
             this.bootMsg = 'Đang tải dữ liệu offline...';
+            // HOTFIX 2026-06-13: bundle.js cũ seed preset sẽ UPDATE cột payment/sepay/telegram
+            // CHƯA tồn tại (migration chạy sau seed) → nổ "no such column" → treo boot máy mới.
+            // Tách 3 khối đó khỏi preset trước seed; preset-rescue phía dưới áp lại sau migration.
+            let _presetExtras = null;
+            if (window.__BRANCH_PRESET__) {
+              const _bp = window.__BRANCH_PRESET__;
+              _presetExtras = { payment: _bp.payment, sepay: _bp.sepay, telegram: _bp.telegram };
+              delete _bp.payment; delete _bp.sepay; delete _bp.telegram;
+            }
             await DB.init();
+            if (_presetExtras && window.__BRANCH_PRESET__) Object.assign(window.__BRANCH_PRESET__, _presetExtras);
             this.bootMsg = 'Đang nạp danh sách chi nhánh...';
             this.branches = Models.listBranches();
             // Xác định branch: từ localStorage, nếu không có thì lấy branch đầu tiên

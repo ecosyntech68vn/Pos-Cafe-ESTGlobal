@@ -434,10 +434,14 @@
     } else {
       db = new SQL.Database();
       await applySchema();
+      // HOTFIX 2026-06-13: migration PHẢI chạy TRƯỚC seed — schema gốc thiếu cột
+      // payment/sepay/telegram (do migration v2/v3 thêm). Seed có preset sẽ UPDATE
+      // các cột đó → "no such column" → boot treo "Đang tải menu..." trên MÁY MỚI.
+      runMigrations();
       const seeded = await seedIfEmpty();
       EventBus.emit('db:loaded', { fromStorage: false, seeded });
     }
-    // Run migrations (idempotent)
+    // Run migrations (idempotent — DB cũ từ storage vẫn cần)
     runMigrations();
     // 2026-06-10 v4 auto-fix: DB seed bản cũ có variant L modifier=0 (bán L giá M).
     // Giá L gốc đã mất khi seed → không vá tại chỗ được. Nếu CHƯA có đơn nào thì

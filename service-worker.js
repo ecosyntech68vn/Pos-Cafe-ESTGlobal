@@ -4,7 +4,7 @@
 // ============================================================================
 // 2026-06-10 v9: thêm kiotviet-pull.js (index.html load nhưng không cache → offline chết),
 // 4 file data/*.csv (db.js seed lần đầu cần), branch-preset config.
-const CACHE = 'pos-cafe-v21'; // v21 2026-06-13: kiosk nhúng preset + rescue payment QR config
+const CACHE = 'pos-cafe-v22'; // v22 2026-06-13: FIX BOOT TREO MÁY MỚI — seed preset UPDATE cột payment chưa tồn tại (migration chạy sau seed) → "no such column" nuốt lặng. Sửa db.js (migration trước seed) + index/kiosk tách preset extras trước DB.init()
 // ⚠ QUY TẮC: MỖI lần sửa index.html/bundle.js PHẢI bump version này — không bump,
 // máy khách bị service worker giữ bản cũ vĩnh viễn (cache-first).
 const CORE_ASSETS = [
